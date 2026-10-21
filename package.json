@@ -1,0 +1,17 @@
+{
+  "name": "apple-health-nutrition-sync",
+  "version": "1.0.0",
+  "description": "Bridges Poke nutrition tracking to Apple HealthKit via iOS Shortcuts, running on Hack Club Nest.",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "license": "MIT"
+}
