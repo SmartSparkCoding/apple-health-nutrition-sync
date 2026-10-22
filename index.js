@@ -45,7 +45,18 @@ function requireAuth(req, res, next) {
   next();
 }
 
-const NUMERIC_FIELDS = ['calories', 'protein', 'carbs', 'fat'];
+// Core macros (kcal, g) and optional extra metrics (caffeine mg, water ml, fibre g, sugar g).
+// Optional fields default to 0 when omitted, so older clients keep working.
+const NUMERIC_FIELDS = ['calories', 'protein', 'carbs', 'fat', 'caffeine', 'water', 'fibre', 'sugar'];
+
+// Fill in any missing numeric fields on records saved before these fields existed.
+function withDefaults(meal) {
+  const out = { ...meal };
+  for (const field of NUMERIC_FIELDS) {
+    if (out[field] === undefined || out[field] === null) out[field] = 0;
+  }
+  return out;
+}
 
 function normaliseMeal(input) {
   if (!input || typeof input !== 'object') return { error: 'Meal must be an object' };
@@ -56,10 +67,6 @@ function normaliseMeal(input) {
     id: input.id ? String(input.id) : crypto.randomUUID(),
     name: input.name ? String(input.name) : 'Meal',
     timestamp: timestamp.toISOString(),
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fat: 0,
     synced: false,
     syncedAt: null,
   };
@@ -105,7 +112,7 @@ app.post('/meals', requireAuth, (req, res) => {
 
 // The iOS Shortcut calls this to fetch meals that have not been written to HealthKit yet.
 app.get('/meals/pending', requireAuth, (req, res) => {
-  const pending = loadMeals().filter((m) => !m.synced);
+  const pending = loadMeals().filter((m) => !m.synced).map(withDefaults);
   res.json({ count: pending.length, meals: pending });
 });
 

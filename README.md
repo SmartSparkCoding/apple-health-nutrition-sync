@@ -24,7 +24,7 @@ All endpoints except `/health` require the auth key, sent either as the header `
 | --- | --- | --- |
 | GET | `/health` | Liveness check. No auth. Returns `{"ok": true}`. |
 | POST | `/meals` | Add one meal, or many via `{"meals": [...]}`. Duplicate `id`s are skipped. |
-| GET | `/meals/pending` | Returns meals where `synced` is false. |
+| GET | `/meals/pending` | Returns meals where `synced` is false. Every meal includes all nutrient fields, with missing optional fields returned as 0. |
 | POST | `/meals/:id/synced` | Marks a single meal as synced. |
 | POST | `/meals/synced` | Batch mark: body `{"ids": ["..."]}`. |
 
@@ -38,13 +38,19 @@ A meal object looks like this:
   "calories": 520,
   "protein": 38,
   "carbs": 45,
-  "fat": 18
+  "fat": 18,
+  "caffeine": 0,
+  "water": 250,
+  "fibre": 6,
+  "sugar": 4
 }
 ```
 
 - `id` is optional. If omitted, a UUID is generated. Supplying your own stable id lets Poke retry safely without creating duplicates.
 - `timestamp` is optional (defaults to now). It is used as the start and end date of the Health samples.
 - Nutrient values are in kcal for `calories` and grams for `protein`, `carbs`, and `fat`.
+- Optional extra metrics: `caffeine` in mg, `water` in ml, `fibre` in g, and `sugar` in g. Each one is optional and defaults to 0 if omitted. All must be non-negative numbers.
+- Meals saved before these fields were added are still valid. `GET /meals/pending` returns them with the new fields set to 0.
 
 Example request:
 
@@ -52,7 +58,7 @@ Example request:
 curl -X POST https://poke.mini-jacob.hackclub.app/meals \
   -H "Content-Type: application/json" \
   -H "x-auth-key: YOUR_AUTH_KEY" \
-  -d '{"name":"Oats","calories":350,"protein":12,"carbs":60,"fat":7}'
+  -d '{"name":"Oats","calories":350,"protein":12,"carbs":60,"fat":7,"fibre":8,"sugar":5}'
 ```
 
 ## 2. Deploying and running on Nest
@@ -182,7 +188,7 @@ You will need the base URL https://poke.mini-jacob.hackclub.app and your AUTH_KE
 ### Step 4: Loop over the meals
 
 1. Add the action "Repeat with Each" and set its input to the list from Step 3. Each pass gives you one meal as the Repeat Item.
-2. Inside the loop, add "Get Dictionary Value" actions on the Repeat Item, each followed by Set Variable, to read: `timestamp` into `MealTime`, `calories` into `Calories`, `protein` into `Protein`, `carbs` into `Carbs`, `fat` into `Fat`, and `id` into `MealID`.
+2. Inside the loop, add "Get Dictionary Value" actions on the Repeat Item, each followed by Set Variable, to read: `timestamp` into `MealTime`, `calories` into `Calories`, `protein` into `Protein`, `carbs` into `Carbs`, `fat` into `Fat`, and `id` into `MealID`. The extra metrics (`caffeine`, `water`, `fibre`, `sugar`) can be read the same way when you add their Health samples.
 3. Add a "Format Date" action with Format set to ISO 8601 and the input set to `MealTime`. Set the output to a variable named `MealDate`. Use `MealDate` as the start and end date in the next steps.
 
 ### Step 5: Log the Health samples
@@ -195,6 +201,8 @@ Inside the loop, add four "Log Health Sample" actions, one for each type:
 4. Sample Type: Dietary Fat Total. Value: `Fat`. Unit: g. Start Date and End Date: `MealDate`.
 
 If a value is 0, you can leave the sample in place or wrap it in an "If" action (Value is greater than 0) to skip it.
+
+Optional extra samples (not yet in the Shortcut, add them when you want them logged): Caffeine (mg), Water (ml, Dietary Water), Fiber (g, Dietary Fiber) and Sugar (g, Dietary Sugar). Each one uses the same Start and End Date of `MealDate`, and should be wrapped in an "If" action (Value is greater than 0).
 
 ### Step 6: Mark the meal as synced
 
